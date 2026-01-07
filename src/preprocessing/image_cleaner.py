@@ -3,8 +3,8 @@ import numpy as np
 
 def preprocess_image(
     image_path: str,
-    blur_kernel: int = 5,
-    threshold: int = 100
+    blur_kernel: int,
+    threshold: int
 ):
     """
     Lê um rascunho e retorna uma imagem binarizada e limpa.
