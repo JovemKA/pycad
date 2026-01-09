@@ -21,8 +21,5 @@ MERGE_GAP = 120
 # Comprimento mínimo final de uma parede
 MIN_WALL_AXIS_LENGTH = 80
 
-# distância máxima entre linhas paralelas para colapsar (px)
-MAX_WALL_THICKNESS = 40
-
-# porcentagem mínima de sobreposição (0–1)
-MIN_OVERLAP_RATIO = 0.6
+# pixels – ajuste fino depois
+MAX_DIMENSION_OFFSET = 40

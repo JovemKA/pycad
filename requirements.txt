@@ -1,7 +1,5 @@
 opencv-python
 numpy
-pytesseract
-Pillow
+paddlepaddle
+paddleocr
 ezdxf
-shapely
-matplotlib

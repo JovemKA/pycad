@@ -12,6 +12,17 @@ class Wall:
     end: int
 
 
+@dataclass
+class DimensionLine:
+    orientation: str
+    coord: float
+    start: int
+    end: int
+    value: str | None = None
+    score: float | None = None
+    target_wall: Wall | None = None
+
+
 def detect_walls(edges):
     lines = cv2.HoughLinesP(
         edges,
@@ -29,9 +40,45 @@ def detect_walls(edges):
     normalized = normalize_lines(raw_lines)
     grouped = group_colinear_lines(normalized)
     merged = merge_groups(grouped)
-    collapsed = collapse_parallel_walls(merged)
 
-    return collapsed
+    return merged
+
+
+def separate_walls_and_dimensions(walls, ocr_items):
+    real_walls = []
+    dimension_lines = []
+
+    for w in walls:
+        matched_dimension = None
+
+        for item in ocr_items:
+            if not is_numeric_dimension(item["text"]):
+                continue
+
+            if not is_text_parallel_to_wall(item["bbox"], w):
+                continue
+
+            dist = distance_text_to_wall(item["bbox"], w)
+            if dist > config.MAX_DIMENSION_OFFSET:
+                continue
+
+            matched_dimension = DimensionLine(
+                orientation=w.orientation,
+                coord=w.coord,
+                start=w.start,
+                end=w.end,
+                value=item["text"],
+                score=item["score"],
+                target_wall=w,
+            )
+            break
+
+        if matched_dimension:
+            dimension_lines.append(matched_dimension)
+        else:
+            real_walls.append(w)
+
+    return real_walls, dimension_lines
 
 
 def normalize_lines(lines):
@@ -111,42 +158,32 @@ def merge_groups(groups):
     return walls
 
 
-def collapse_parallel_walls(walls):
-    result = []
-    used = set()
+def is_numeric_dimension(text: str) -> bool:
+    try:
+        float(text.replace(",", "."))
+        return True
+    except ValueError:
+        return False
 
-    for i, w1 in enumerate(walls):
-        if i in used:
-            continue
 
-        group = [w1]
-        used.add(i)
+def is_text_parallel_to_wall(bbox, wall: Wall) -> bool:
+    xs = [p[0] for p in bbox]
+    ys = [p[1] for p in bbox]
 
-        for j, w2 in enumerate(walls[i + 1 :], start=i + 1):
-            if j in used:
-                continue
+    width = max(xs) - min(xs)
+    height = max(ys) - min(ys)
 
-            if w1.orientation != w2.orientation:
-                continue
+    if wall.orientation == "horizontal":
+        return width > height
+    else:
+        return height > width
 
-            if abs(w1.coord - w2.coord) > config.MAX_WALL_THICKNESS:
-                continue
 
-            overlap = min(w1.end, w2.end) - max(w1.start, w2.start)
-            min_len = min(w1.end - w1.start, w2.end - w2.start)
+def distance_text_to_wall(bbox, wall: Wall) -> float:
+    cx = sum(p[0] for p in bbox) / 4
+    cy = sum(p[1] for p in bbox) / 4
 
-            if overlap > 0 and overlap / min_len >= config.MIN_OVERLAP_RATIO:
-                group.append(w2)
-                used.add(j)
-
-        if len(group) == 1:
-            result.append(w1)
-        else:
-            coord = sum(w.coord for w in group) / len(group)
-            start = min(w.start for w in group)
-            end = max(w.end for w in group)
-            result.append(
-                Wall(w1.orientation, coord, start, end)
-              )
-
-    return result
+    if wall.orientation == "horizontal":
+        return abs(cy - wall.coord)
+    else:
+        return abs(cx - wall.coord)
